@@ -1,6 +1,7 @@
-package handler;
+package main.java.com.seckillservice.handler;
 
-import models.Transaction;
+import main.java.com.seckillservice.common.models.Transaction;
+import main.java.com.seckillservice.utils.constants;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -8,32 +9,19 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Date;
+import java.util.Map;
 import java.util.Optional;
 
-import static config.constants.CREATE_DATE_COLUMN_NAME;
-import static config.constants.DATABASE_URL;
-import static config.constants.DELETE_TRANSACTION;
-import static config.constants.GET_CREATED_TRANSACTION;
-import static config.constants.GET_TRANSACTION;
-import static config.constants.ID_COLUMN_NAME;
-import static config.constants.INITIALIZE_TRANSACTION_TABLE;
-import static config.constants.INSERT_TRANSACTION;
-import static config.constants.INVENTORY_ID_COLUMN_NAME;
-import static config.constants.JDBC_DRIVER_CLASS;
-import static config.constants.PASSWORD;
-import static config.constants.USERNAME;
+import static main.java.com.seckillservice.utils.constants.CONNECTION;
+import static main.java.com.seckillservice.utils.constants.STATEMENT;
 
 public class TransactionHandler {
-    private Connection conn;
-    private Statement stmt;
     private static TransactionHandler instance;
 
     // TODO: Add logger, refactor code
     // FIXME: handle when adding duplicated records
 
     private TransactionHandler() {
-        conn = null;
-        stmt = null;
         initializeTransactionTable();
     }
 
@@ -50,13 +38,16 @@ public class TransactionHandler {
      * @return the transaction object containing all information
      */
     public Transaction createTransaction(String inventoryId) {
+        Connection conn = null;
+        Statement stmt = null;
         try {
-            setUpConnectionAndStatement();
+            Map<String, Object> map = setUpConnectionAndStatement();
+            conn = (Connection) map.get(CONNECTION);
+            stmt = (Statement) map.get(STATEMENT);
             long timestamp = new Date().getTime() / 1000;
-            System.out.println("timestamp:" + timestamp);
-            stmt.execute(String.format(INSERT_TRANSACTION, inventoryId, timestamp));
+            stmt.execute(String.format(constants.INSERT_TRANSACTION, inventoryId, timestamp));
 
-            ResultSet rs = stmt.executeQuery(String.format(GET_CREATED_TRANSACTION, inventoryId, timestamp));
+            ResultSet rs = stmt.executeQuery(String.format(constants.GET_CREATED_TRANSACTION, inventoryId, timestamp));
             if (!rs.next()) {
                 throw new RuntimeException("No matching transaction record found");
             }
@@ -69,7 +60,7 @@ public class TransactionHandler {
         } catch (SQLException e) {
             throw new RuntimeException("Cannot create new transaction entry:", e);
         } finally {
-            closeConnectionAndStatement();
+            closeConnectionAndStatement(conn, stmt);
         }
     }
 
@@ -79,9 +70,13 @@ public class TransactionHandler {
      * @return an optional object containing queried result
      */
     public Optional<Transaction> getTransaction(String id) {
+        Connection conn = null;
+        Statement stmt = null;
         try {
-            setUpConnectionAndStatement();
-            ResultSet rs = stmt.executeQuery(String.format(GET_TRANSACTION, id));
+            Map<String, Object> map = setUpConnectionAndStatement();
+            conn = (Connection) map.get(CONNECTION);
+            stmt = (Statement) map.get(STATEMENT);
+            ResultSet rs = stmt.executeQuery(String.format(constants.GET_TRANSACTION, id));
             Optional<Transaction> result = Optional.empty();
             if (!rs.next()) {
                 return result;
@@ -95,7 +90,7 @@ public class TransactionHandler {
         } catch (SQLException e) {
             throw new RuntimeException("Cannot get transaction entry:", e);
         } finally {
-            closeConnectionAndStatement();
+            closeConnectionAndStatement(conn, stmt);
         }
     }
 
@@ -104,46 +99,55 @@ public class TransactionHandler {
      * @param id the transaction id to delete
      */
     public void deleteTransaction(String id) {
+        Connection conn = null;
+        Statement stmt = null;
         try {
-            setUpConnectionAndStatement();
-            stmt.execute(String.format(DELETE_TRANSACTION, id));
+            Map<String, Object> map = setUpConnectionAndStatement();
+            conn = (Connection) map.get(CONNECTION);
+            stmt = (Statement) map.get(STATEMENT);
+            stmt.execute(String.format(constants.DELETE_TRANSACTION, id));
         } catch (ClassNotFoundException e) {
             throw new RuntimeException("Cannot setup JDBC connection:", e);
         } catch (SQLException e) {
             throw new RuntimeException("Cannot delete transaction:", e);
         } finally {
-            closeConnectionAndStatement();
+            closeConnectionAndStatement(conn, stmt);
         }
     }
 
     private Transaction toTransactionObject(ResultSet rs) throws SQLException {
         Transaction res = new Transaction();
-        res.setId(String.valueOf(rs.getInt(ID_COLUMN_NAME)));
-        res.setInventoryId(rs.getString(INVENTORY_ID_COLUMN_NAME));
-        res.setCreateDate(new Date(rs.getDate(CREATE_DATE_COLUMN_NAME).getTime()));
+        res.setId(String.valueOf(rs.getInt(constants.ID_COLUMN_NAME)));
+        res.setInventoryId(rs.getString(constants.INVENTORY_ID_COLUMN_NAME));
+        res.setCreateDate(new Date(rs.getDate(constants.CREATE_DATE_COLUMN_NAME).getTime()));
         return res;
     }
 
     private void initializeTransactionTable() {
+        Connection conn = null;
+        Statement stmt = null;
         try {
-            setUpConnectionAndStatement();
-            stmt.execute(INITIALIZE_TRANSACTION_TABLE);
+            Map<String, Object> map = setUpConnectionAndStatement();
+            conn = (Connection) map.get(CONNECTION);
+            stmt = (Statement) map.get(STATEMENT);
+            stmt.execute(constants.INITIALIZE_TRANSACTION_TABLE);
         } catch (ClassNotFoundException e) {
             throw new RuntimeException("Cannot setup JDBC connection:", e);
         } catch (SQLException e) {
             throw new RuntimeException("Cannot initialize transaction table:", e);
         } finally {
-            closeConnectionAndStatement();
+            closeConnectionAndStatement(conn, stmt);
         }
     }
 
-    private void setUpConnectionAndStatement() throws ClassNotFoundException, SQLException {
-        Class.forName(JDBC_DRIVER_CLASS);
-        conn = DriverManager.getConnection(DATABASE_URL, USERNAME, PASSWORD);
-        stmt = conn.createStatement();
+    private Map<String, Object> setUpConnectionAndStatement() throws ClassNotFoundException, SQLException {
+        Class.forName(constants.JDBC_DRIVER_CLASS);
+        Connection conn = DriverManager.getConnection(constants.DATABASE_URL, constants.USERNAME, constants.PASSWORD);
+        Statement stmt = conn.createStatement();
+        return Map.of(CONNECTION, conn, STATEMENT, stmt);
     }
 
-    private void closeConnectionAndStatement() {
+    private void closeConnectionAndStatement(Connection conn, Statement stmt) {
         try {
             if (stmt != null) {
                 stmt.close();

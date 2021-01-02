@@ -1,4 +1,4 @@
-package models;
+package main.java.com.seckillservice.common.models;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;

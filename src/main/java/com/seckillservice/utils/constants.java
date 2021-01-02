@@ -1,6 +1,8 @@
-package config;
+package main.java.com.seckillservice.utils;
 
 public class constants {
+    public static final String CONNECTION = "Connection";
+    public static final String STATEMENT = "Statement";
     // JDBC Driver constants
     // TODO: Hide username password
     public static final String JDBC_DRIVER_CLASS = "com.mysql.cj.jdbc.Driver";

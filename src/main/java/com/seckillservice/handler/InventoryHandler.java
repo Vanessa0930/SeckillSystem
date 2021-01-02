@@ -1,41 +1,28 @@
-package handler;
+package main.java.com.seckillservice.handler;
 
-import models.Inventory;
+import main.java.com.seckillservice.common.models.Inventory;
+import main.java.com.seckillservice.utils.constants;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Map;
 import java.util.Optional;
 
-import static config.constants.COUNT_COLUMN_NAME;
-import static config.constants.DATABASE_URL;
-import static config.constants.DELETE_INVENTORY;
-import static config.constants.GET_CREATED_INVENTORY;
-import static config.constants.GET_INVENTORY;
-import static config.constants.ID_COLUMN_NAME;
-import static config.constants.INITIALIZE_INVENTORY_TABLE;
-import static config.constants.INSERT_INVENTORY;
-import static config.constants.JDBC_DRIVER_CLASS;
-import static config.constants.NAME_COLUMN_NAME;
-import static config.constants.PASSWORD;
-import static config.constants.SALES_COLUMN_NAME;
-import static config.constants.UPDATE_INVENTORY;
-import static config.constants.USERNAME;
-import static config.constants.VERSION_COLUMN_NAME;
+import static main.java.com.seckillservice.utils.constants.CONNECTION;
+import static main.java.com.seckillservice.utils.constants.GET_INVENTORY;
+import static main.java.com.seckillservice.utils.constants.INITIALIZE_INVENTORY_TABLE;
+import static main.java.com.seckillservice.utils.constants.STATEMENT;
 
 public class InventoryHandler {
-    private Connection conn;
-    private Statement stmt;
     private static InventoryHandler instance;
 
     // TODO: Add logger, refactor code
     // FIXME: handle when adding duplicated records
 
     private InventoryHandler() {
-        conn = null;
-        stmt = null;
         initializeInventoryTable();
     }
 
@@ -53,10 +40,14 @@ public class InventoryHandler {
      * @return the inventory object containing all information
      */
     public Inventory createInventory(String name, int count) {
+        Connection conn = null;
+        Statement stmt = null;
         try {
-            setUpConnectionAndStatement();
-            stmt.execute(String.format(INSERT_INVENTORY, name, count));
-            ResultSet rs = stmt.executeQuery(String.format(GET_CREATED_INVENTORY, name, count));
+            Map<String, Object> result = setUpConnectionAndStatement();
+            conn = (Connection) result.get(CONNECTION);
+            stmt = (Statement) result.get(STATEMENT);
+            stmt.execute(String.format(constants.INSERT_INVENTORY, name, count));
+            ResultSet rs = stmt.executeQuery(String.format(constants.GET_CREATED_INVENTORY, name, count));
             if (!rs.next()) {
                 throw new RuntimeException("No matching record found");
             }
@@ -69,7 +60,7 @@ public class InventoryHandler {
         } catch (SQLException e) {
             throw new RuntimeException("Cannot create new inventory entry:", e);
         } finally {
-            closeConnectionAndStatement();
+            closeConnectionAndStatement(conn, stmt);
         }
     }
 
@@ -79,8 +70,12 @@ public class InventoryHandler {
      * @return an optional object containing queried result
      */
     public Optional<Inventory> getInventory(String id) {
+        Connection conn = null;
+        Statement stmt = null;
         try {
-            setUpConnectionAndStatement();
+            Map<String, Object> map = setUpConnectionAndStatement();
+            conn = (Connection) map.get(CONNECTION);
+            stmt = (Statement) map.get(STATEMENT);
             ResultSet rs = stmt.executeQuery(String.format(GET_INVENTORY, id));
             Optional<Inventory> result = Optional.empty();
             if (!rs.next()) {
@@ -95,24 +90,32 @@ public class InventoryHandler {
         } catch (SQLException e) {
             throw new RuntimeException("Cannot get inventory entry:", e);
         } finally {
-            closeConnectionAndStatement();
+            closeConnectionAndStatement(conn, stmt);
         }
     }
 
     /**
-     * Replace and update the inventory record
+     * Replace and update the inventory record following optimistic lock strategy
      * @param inventory the new object to update for
      */
-    public void updateInventory(Inventory inventory) {
+    public void updateInventoryOptimistically(Inventory inventory) {
+        Connection conn = null;
+        Statement stmt = null;
         try {
-            setUpConnectionAndStatement();
-            stmt.execute(String.format(UPDATE_INVENTORY, inventory.getId(), inventory.getVersion()));
+            Map<String, Object> map = setUpConnectionAndStatement();
+            conn = (Connection) map.get(CONNECTION);
+            stmt = (Statement) map.get(STATEMENT);
+            stmt.execute(String.format(constants.UPDATE_INVENTORY, inventory.getId(), inventory.getVersion()));
+
+            inventory.setCount(inventory.getCount() - 1);
+            inventory.setSales(inventory.getSales() + 1);
+            inventory.setVersion(inventory.getVersion() + 1);
         } catch (ClassNotFoundException e) {
             throw new RuntimeException("Cannot setup JDBC connection:", e);
         } catch (SQLException e) {
             throw new RuntimeException("Cannot update inventory:", e);
         } finally {
-            closeConnectionAndStatement();
+            closeConnectionAndStatement(conn, stmt);
         }
     }
 
@@ -121,48 +124,58 @@ public class InventoryHandler {
      * @param id the inventory id to delete
      */
     public void deleteInventory(String id) {
+        Connection conn = null;
+        Statement stmt = null;
         try {
-            setUpConnectionAndStatement();
-            stmt.execute(String.format(DELETE_INVENTORY, id));
+            Map<String, Object> map = setUpConnectionAndStatement();
+            conn = (Connection) map.get(CONNECTION);
+            stmt = (Statement) map.get(STATEMENT);
+            stmt.execute(String.format(constants.DELETE_INVENTORY, id));
         } catch (ClassNotFoundException e) {
             throw new RuntimeException("Cannot setup JDBC connection:", e);
         } catch (SQLException e) {
             throw new RuntimeException("Cannot delete inventory:", e);
         } finally {
-            closeConnectionAndStatement();
+            closeConnectionAndStatement(conn, stmt);
         }
     }
 
     private Inventory toInventoryObject(ResultSet rs) throws SQLException {
         Inventory res = new Inventory();
-        res.setId(String.valueOf(rs.getInt(ID_COLUMN_NAME)));
-        res.setName(rs.getString(NAME_COLUMN_NAME));
-        res.setSales(rs.getInt(SALES_COLUMN_NAME));
-        res.setCount(rs.getInt(COUNT_COLUMN_NAME));
-        res.setVersion(rs.getInt(VERSION_COLUMN_NAME));
+        res.setId(String.valueOf(rs.getInt(constants.ID_COLUMN_NAME)));
+        res.setName(rs.getString(constants.NAME_COLUMN_NAME));
+        res.setSales(rs.getInt(constants.SALES_COLUMN_NAME));
+        res.setCount(rs.getInt(constants.COUNT_COLUMN_NAME));
+        res.setVersion(rs.getInt(constants.VERSION_COLUMN_NAME));
         return res;
     }
 
     private void initializeInventoryTable() {
+        Connection conn = null;
+        Statement stmt = null;
         try {
-            setUpConnectionAndStatement();
+            Map<String, Object> map = setUpConnectionAndStatement();
+            conn = (Connection) map.get(CONNECTION);
+            stmt = (Statement) map.get(STATEMENT);
             stmt.execute(INITIALIZE_INVENTORY_TABLE);
         } catch (ClassNotFoundException e) {
             throw new RuntimeException("Cannot setup JDBC connection:", e);
         } catch (SQLException e) {
             throw new RuntimeException("Cannot initialize inventory table:", e);
         } finally {
-            closeConnectionAndStatement();
+            closeConnectionAndStatement(conn, stmt);
         }
     }
 
-    private void setUpConnectionAndStatement() throws ClassNotFoundException, SQLException {
-        Class.forName(JDBC_DRIVER_CLASS);
-        conn = DriverManager.getConnection(DATABASE_URL, USERNAME, PASSWORD);
-        stmt = conn.createStatement();
+    private Map<String, Object> setUpConnectionAndStatement() throws ClassNotFoundException, SQLException {
+        Class.forName(constants.JDBC_DRIVER_CLASS);
+        Connection conn = DriverManager.getConnection(
+                constants.DATABASE_URL, constants.USERNAME, constants.PASSWORD);
+        Statement stmt = conn.createStatement();
+        return Map.of(CONNECTION, conn, STATEMENT, stmt);
     }
 
-    private void closeConnectionAndStatement() {
+    private void closeConnectionAndStatement(Connection conn, Statement stmt) {
         try {
             if (stmt != null) {
                 stmt.close();

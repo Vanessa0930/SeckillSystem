@@ -1,4 +1,4 @@
-package models;
+package main.java.com.seckillservice.common.models;
 
 public class Inventory {
     private String id;
