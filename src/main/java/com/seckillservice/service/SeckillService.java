@@ -8,12 +8,27 @@ import main.java.com.seckillservice.handler.TransactionHandler;
 
 import java.util.Optional;
 
-public class SeckillService {
-    private static InventoryHandler inventoryService = InventoryHandler.getInstance();
-    private static TransactionHandler transactionService = TransactionHandler.getInstance();
+import static main.java.com.seckillservice.utils.constants.ACCESS_DENIED;
+import static main.java.com.seckillservice.utils.constants.FAILED_RESULT;
+import static main.java.com.seckillservice.utils.constants.OUT_OF_STOCK;
+import static main.java.com.seckillservice.utils.constants.SUCCESS_RESULT;
 
-    private static final String SUCCESS_RESULT = "Successfully created the order. Transaction ID: %s";
-    private static final String FAILED_RESULT = "Failed to create the order. Please try again.";
+public class SeckillService {
+    private static SeckillService instance;
+    private static InventoryHandler inventoryService;
+    private static TransactionHandler transactionService;
+
+    private SeckillService() {
+        inventoryService = new InventoryHandler();
+        transactionService = new TransactionHandler();
+    }
+
+    public static synchronized SeckillService getInstance() {
+        if (instance == null) {
+            instance = new SeckillService();
+        }
+        return instance;
+    }
 
     /**
      * Submit a request for selected item and returns the transaction id if succeeded
@@ -22,10 +37,12 @@ public class SeckillService {
      * TODO: Assume there is only one item for bidding at one time.
      * @return corresponding transaction id if succeeded
      */
-    public String submitRequest(String inventoryId) {
+    public synchronized String submitRequest(String inventoryId) {
         try {
             String orderId = requestHelper(inventoryId);
             return String.format(SUCCESS_RESULT, orderId);
+        } catch(IllegalArgumentException e) {
+            return String.format(OUT_OF_STOCK, inventoryId);
         } catch (Exception e) {
             e.printStackTrace();
             return String.format(FAILED_RESULT);
@@ -41,23 +58,25 @@ public class SeckillService {
      * @param inventoryId the inventory id for selected item
      * @return corresponding transaction id if succeeded.
      */
-    public String submitRequestWithRedis(String inventoryId) {
+    public synchronized String submitRequestWithRedis(String inventoryId) {
         try {
             if (RedisTokenLimiter.canGetAccess()) {
                 String orderId = requestHelper(inventoryId);
                 return String.format(SUCCESS_RESULT, orderId);
             }
+        } catch (IllegalArgumentException e) {
+            return String.format(OUT_OF_STOCK, inventoryId);
         } catch (Exception e) {
             e.printStackTrace();
             return String.format(FAILED_RESULT);
         }
-        return "Request being throttled.";
+        return ACCESS_DENIED;
     }
 
-    private String requestHelper(String inventoryId) {
+    private String requestHelper(String inventoryId) throws IllegalAccessException {
         Optional<Inventory> queryRes = inventoryService.getInventory(inventoryId);
         if (!queryRes.isPresent() || queryRes.get().getCount() < 1) {
-            throw new RuntimeException("Selected item is out of stock");
+            throw new IllegalAccessException("Cannot find available item in the inventory.");
         }
 
         Inventory inventory = queryRes.get();

@@ -17,20 +17,12 @@ import static main.java.com.seckillservice.utils.constants.INITIALIZE_INVENTORY_
 import static main.java.com.seckillservice.utils.constants.STATEMENT;
 
 public class InventoryHandler {
-    private static InventoryHandler instance;
 
     // TODO: Add logger, refactor code
     // FIXME: handle when adding duplicated records
 
-    private InventoryHandler() {
+    public InventoryHandler() {
         initializeInventoryTable();
-    }
-
-    public static InventoryHandler getInstance() {
-        if (instance == null) {
-            instance = new InventoryHandler();
-        }
-        return instance;
     }
 
     /**
@@ -46,12 +38,20 @@ public class InventoryHandler {
             Map<String, Object> result = setUpConnectionAndStatement();
             conn = (Connection) result.get(CONNECTION);
             stmt = (Statement) result.get(STATEMENT);
-            stmt.execute(String.format(constants.INSERT_INVENTORY, name, count));
-            ResultSet rs = stmt.executeQuery(String.format(constants.GET_CREATED_INVENTORY, name, count));
+            stmt.executeUpdate(String.format(constants.INSERT_INVENTORY, name, count),
+                    Statement.RETURN_GENERATED_KEYS);
+            ResultSet rs = stmt.getGeneratedKeys();
             if (!rs.next()) {
-                throw new RuntimeException("No matching record found");
+                throw new RuntimeException("No matching record id returned");
             }
-            Inventory res = toInventoryObject(rs);
+
+            int id = rs.getInt(1);
+            Inventory res = new Inventory();
+            res.setId(String.valueOf(id));
+            res.setCount(count);
+            res.setName(name);
+            res.setSales(0);
+            res.setVersion(1);
 
             rs.close();
             return res;

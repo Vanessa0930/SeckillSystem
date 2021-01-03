@@ -1,6 +1,12 @@
 package main.java.com.seckillservice.utils;
 
 public class constants {
+    // order status
+    public static final String SUCCESS_RESULT = "Successfully created the order. Transaction ID: %s";
+    public static final String OUT_OF_STOCK = "Selected item %s is out of stock.";
+    public static final String FAILED_RESULT = "Failed to create the order. Please try again.";
+    public static final String ACCESS_DENIED = "Request being throttled.";
+
     public static final String CONNECTION = "Connection";
     public static final String STATEMENT = "Statement";
     // JDBC Driver constants

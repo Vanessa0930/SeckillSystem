@@ -26,11 +26,11 @@ public class RedisPool {
         instance = new JedisPool(config, REDIS_HOST_ADDRESS, REDIS_PORT, DEFAULT_TIMEOUT);
     }
 
-    static {
-        init();
-    }
-
     public static Jedis getJedis() {
+        if (instance == null) {
+            init();
+        }
+        System.out.println(instance.hashCode());
         return instance.getResource();
     }
 

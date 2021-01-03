@@ -1,4 +1,4 @@
-package test.java.com.seckillservice.integration;
+package main.java.com.seckillservice;
 
 import main.java.com.seckillservice.common.models.Inventory;
 import main.java.com.seckillservice.handler.InventoryHandler;
@@ -18,12 +18,12 @@ public class CreateItemIntegTest extends AbstractJavaSamplerClient {
     public void setupTest(JavaSamplerContext args) {
         itemName = args.getParameter(ITEM_NAME);
         itemCount = Integer.valueOf(args.getParameter(COUNT));
+        inventoryHandler = new InventoryHandler();
     }
 
     @Override
     public SampleResult runTest(JavaSamplerContext args) {
         SampleResult result = new SampleResult();
-        inventoryHandler = InventoryHandler.getInstance();
         try {
             result.sampleStart();
             Inventory item = inventoryHandler.createInventory(itemName, itemCount);

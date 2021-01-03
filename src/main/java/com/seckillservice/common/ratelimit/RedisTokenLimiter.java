@@ -3,6 +3,8 @@ package main.java.com.seckillservice.common.ratelimit;
 import redis.clients.jedis.Jedis;
 
 import main.java.com.seckillservice.utils.redis.RedisPool;
+
+import java.io.IOException;
 import java.util.Collections;
 
 import static main.java.com.seckillservice.utils.redis.LuaScriptUtil.getRateLimiterScriptSource;
@@ -19,7 +21,7 @@ public class RedisTokenLimiter {
     // Set limit to 5 requests/sec
     private static Integer LIMIT_THRESHOLD = 5;
 
-    public static boolean canGetAccess() {
+    public static boolean canGetAccess() throws IOException {
         Jedis jedis = null;
         Object result;
         try {

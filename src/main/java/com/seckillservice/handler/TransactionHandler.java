@@ -16,20 +16,11 @@ import static main.java.com.seckillservice.utils.constants.CONNECTION;
 import static main.java.com.seckillservice.utils.constants.STATEMENT;
 
 public class TransactionHandler {
-    private static TransactionHandler instance;
-
     // TODO: Add logger, refactor code
     // FIXME: handle when adding duplicated records
 
-    private TransactionHandler() {
+    public TransactionHandler() {
         initializeTransactionTable();
-    }
-
-    public static TransactionHandler getInstance() {
-        if (instance == null) {
-            instance = new TransactionHandler();
-        }
-        return instance;
     }
 
     /**
@@ -45,13 +36,19 @@ public class TransactionHandler {
             conn = (Connection) map.get(CONNECTION);
             stmt = (Statement) map.get(STATEMENT);
             long timestamp = new Date().getTime() / 1000;
-            stmt.execute(String.format(constants.INSERT_TRANSACTION, inventoryId, timestamp));
+            stmt.executeUpdate(String.format(constants.INSERT_TRANSACTION, inventoryId, timestamp),
+                    Statement.RETURN_GENERATED_KEYS);
 
-            ResultSet rs = stmt.executeQuery(String.format(constants.GET_CREATED_TRANSACTION, inventoryId, timestamp));
+            // FIXME: BUG: Get transaction id directly, not work when timestamp is the same
+            ResultSet rs = stmt.getGeneratedKeys();
             if (!rs.next()) {
-                throw new RuntimeException("No matching transaction record found");
+                throw new RuntimeException("No matching transaction id returned");
             }
-            Transaction res = toTransactionObject(rs);
+            int id = rs.getInt(1);
+            Transaction res = new Transaction();
+            res.setId(String.valueOf(id));
+            res.setInventoryId(inventoryId);
+            res.setCreateDate(new Date(timestamp));
 
             rs.close();
             return res;
