@@ -1,4 +1,4 @@
-package main.java.com.seckillservice.utils.redis;
+package com.seckillservice.utils.redis;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -28,6 +28,6 @@ public class LuaScriptUtil {
     }
 
     public static String getRateLimiterScriptSource() {
-        return "limit.lua";
+        return "ratelimit/limit.lua";
     }
 }

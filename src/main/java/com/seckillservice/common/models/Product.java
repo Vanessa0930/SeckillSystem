@@ -1,4 +1,4 @@
-package main.java.com.seckillservice.common.models;
+package com.seckillservice.common.models;
 
 public class Product {
     private String id;

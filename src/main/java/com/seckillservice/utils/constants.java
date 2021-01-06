@@ -1,6 +1,13 @@
-package main.java.com.seckillservice.utils;
+package com.seckillservice.utils;
 
 public class constants {
+    // Redis inventory keys
+    public static final String INVENTORY_NAME = "inventory_name_";
+    public static final String INVENTORY_COUNT = "inventory_count_";
+    public static final String INVENTORY_SALE = "inventory_sale_";
+    public static final String INVENTORY_VERSION = "inventory_version_";
+    public static final String INVENTORY_ITEM = "inventory_";
+
     // order status
     public static final String SUCCESS_RESULT = "Successfully created the order. Transaction ID: %s";
     public static final String OUT_OF_STOCK = "Selected item %s is out of stock.";
@@ -30,7 +37,7 @@ public class constants {
     public static final String GET_INVENTORY = "SELECT * FROM inventory WHERE id=%s;";
     public static final String UPDATE_INVENTORY = "UPDATE inventory SET count = count - 1, sales = sales + 1," +
             "version = version + 1 WHERE id=%s AND version=%d;";
-    public static final String GET_CREATED_INVENTORY = "SELECT * FROM inventory WHERE name=\"%s\" AND count=%d;";
+    public static final String GET_ALL_INVENTORY_IDS = "SELECT id FROM inventory";
 
     public static final String ID_COLUMN_NAME = "id";
     public static final String SALES_COLUMN_NAME = "sales";

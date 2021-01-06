@@ -1,14 +1,14 @@
-package main.java.com.seckillservice.common.ratelimit;
+package com.seckillservice.common.ratelimit;
 
 import redis.clients.jedis.Jedis;
 
-import main.java.com.seckillservice.utils.redis.RedisPool;
+import com.seckillservice.utils.redis.RedisPool;
 
 import java.io.IOException;
 import java.util.Collections;
 
-import static main.java.com.seckillservice.utils.redis.LuaScriptUtil.getRateLimiterScriptSource;
-import static main.java.com.seckillservice.utils.redis.LuaScriptUtil.readScript;
+import static com.seckillservice.utils.redis.LuaScriptUtil.getRateLimiterScriptSource;
+import static com.seckillservice.utils.redis.LuaScriptUtil.readScript;
 
 /**
  * Rate limiter implemented using token bucket algorithm and Redis.

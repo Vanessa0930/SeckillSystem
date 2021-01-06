@@ -1,4 +1,4 @@
-package main.java.com.seckillservice.common.models;
+package com.seckillservice.common.models;
 
 public class Inventory {
     private String id;
@@ -13,6 +13,9 @@ public class Inventory {
 
     public String getId() {
         return this.id;
+    }
+    public String getName() {
+        return this.name;
     }
 
     public void setName(String name) {

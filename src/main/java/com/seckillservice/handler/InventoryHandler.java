@@ -1,23 +1,28 @@
-package main.java.com.seckillservice.handler;
+package com.seckillservice.handler;
 
-import main.java.com.seckillservice.common.models.Inventory;
-import main.java.com.seckillservice.utils.constants;
+import com.seckillservice.common.models.Inventory;
+import com.seckillservice.utils.constants;
+import org.springframework.stereotype.Component;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static main.java.com.seckillservice.utils.constants.CONNECTION;
-import static main.java.com.seckillservice.utils.constants.GET_INVENTORY;
-import static main.java.com.seckillservice.utils.constants.INITIALIZE_INVENTORY_TABLE;
-import static main.java.com.seckillservice.utils.constants.STATEMENT;
+import static com.seckillservice.utils.constants.CONNECTION;
+import static com.seckillservice.utils.constants.GET_ALL_INVENTORY_IDS;
+import static com.seckillservice.utils.constants.GET_INVENTORY;
+import static com.seckillservice.utils.constants.ID_COLUMN_NAME;
+import static com.seckillservice.utils.constants.INITIALIZE_INVENTORY_TABLE;
+import static com.seckillservice.utils.constants.STATEMENT;
 
+@Component
 public class InventoryHandler {
-
     // TODO: Add logger, refactor code
     // FIXME: handle when adding duplicated records
 
@@ -131,6 +136,29 @@ public class InventoryHandler {
             conn = (Connection) map.get(CONNECTION);
             stmt = (Statement) map.get(STATEMENT);
             stmt.execute(String.format(constants.DELETE_INVENTORY, id));
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException("Cannot setup JDBC connection:", e);
+        } catch (SQLException e) {
+            throw new RuntimeException("Cannot delete inventory:", e);
+        } finally {
+            closeConnectionAndStatement(conn, stmt);
+        }
+    }
+
+    public List<String> listAllInventoryIds() {
+        Connection conn = null;
+        Statement stmt = null;
+        List<String> result = new ArrayList<>();
+        try {
+            Map<String, Object> map = setUpConnectionAndStatement();
+            conn = (Connection) map.get(CONNECTION);
+            stmt = (Statement) map.get(STATEMENT);
+
+            ResultSet rs = stmt.executeQuery(GET_ALL_INVENTORY_IDS);
+            while (rs.next()) {
+                result.add(rs.getString(ID_COLUMN_NAME));
+            }
+            return result;
         } catch (ClassNotFoundException e) {
             throw new RuntimeException("Cannot setup JDBC connection:", e);
         } catch (SQLException e) {

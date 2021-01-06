@@ -1,7 +1,8 @@
-package main.java.com.seckillservice.handler;
+package com.seckillservice.handler;
 
-import main.java.com.seckillservice.common.models.Transaction;
-import main.java.com.seckillservice.utils.constants;
+import com.seckillservice.common.models.Transaction;
+import com.seckillservice.utils.constants;
+import org.springframework.stereotype.Component;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -12,9 +13,10 @@ import java.util.Date;
 import java.util.Map;
 import java.util.Optional;
 
-import static main.java.com.seckillservice.utils.constants.CONNECTION;
-import static main.java.com.seckillservice.utils.constants.STATEMENT;
+import static com.seckillservice.utils.constants.CONNECTION;
+import static com.seckillservice.utils.constants.STATEMENT;
 
+@Component
 public class TransactionHandler {
     // TODO: Add logger, refactor code
     // FIXME: handle when adding duplicated records

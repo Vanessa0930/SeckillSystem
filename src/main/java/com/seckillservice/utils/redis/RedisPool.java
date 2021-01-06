@@ -1,4 +1,4 @@
-package main.java.com.seckillservice.utils.redis;
+package com.seckillservice.utils.redis;
 
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
@@ -30,7 +30,6 @@ public class RedisPool {
         if (instance == null) {
             init();
         }
-        System.out.println(instance.hashCode());
         return instance.getResource();
     }
 
