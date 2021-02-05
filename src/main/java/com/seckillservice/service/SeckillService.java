@@ -6,6 +6,7 @@ import com.seckillservice.common.models.Transaction;
 import com.seckillservice.common.ratelimit.RedisTokenLimiter;
 import com.seckillservice.handler.InventoryHandler;
 import com.seckillservice.handler.TransactionHandler;
+import com.seckillservice.utils.redis.RedisPool;
 import com.seckillservice.utils.redis.RedisPoolUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -14,15 +15,19 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
+import redis.clients.jedis.Jedis;
 
-import java.util.List;
+import java.sql.SQLException;
 import java.util.Optional;
 
 import static com.seckillservice.common.models.CustomResponse.FAILED;
 import static com.seckillservice.common.models.CustomResponse.SUCCESS;
 import static com.seckillservice.utils.constants.ACCESS_DENIED;
 import static com.seckillservice.utils.constants.FAILED_RESULT;
-import static com.seckillservice.utils.constants.INVENTORY_ITEM;
+import static com.seckillservice.utils.constants.INVENTORY_COUNT;
+import static com.seckillservice.utils.constants.INVENTORY_NAME;
+import static com.seckillservice.utils.constants.INVENTORY_SALES;
+import static com.seckillservice.utils.constants.INVENTORY_VERSION;
 import static com.seckillservice.utils.constants.OUT_OF_STOCK;
 import static com.seckillservice.utils.constants.SUCCESS_RESULT;
 
@@ -89,45 +94,20 @@ public class SeckillService {
                 return new CustomResponse(FAILED, ACCESS_DENIED);
             }
 
-            // Read inventory information from cache
-            Inventory inventory;
-            List<String> cachedInfo = RedisPoolUtils.listAllElements(INVENTORY_ITEM + inventoryId);
-            if (cachedInfo.isEmpty()) {
-                // query directly from database and update cache
-                log.info("No such key {} in cache", INVENTORY_ITEM + inventoryId);
-                Optional<Inventory> queryRes = inventoryService.getInventory(inventoryId);
-                if (!queryRes.isPresent()) {
-                    // TODO: customize response for 404 items
-                    throw new RuntimeException("Cannot find available item in the inventory.");
-                }
-                inventory = queryRes.get();
-                RedisPoolUtils.addToListHead(INVENTORY_ITEM + inventoryId, inventory.getName(),
-                        String.valueOf(inventory.getCount()), String.valueOf(inventory.getSales()),
-                        String.valueOf(inventory.getVersion()));
-            } else {
-                // grab data from cache
-                log.info("Successfully get key {} from cache", INVENTORY_ITEM + inventoryId);
-                inventory = new Inventory();
-                inventory.setId(inventoryId);
-                inventory.setName(cachedInfo.get(1));
-                inventory.setCount(Integer.valueOf(cachedInfo.get(2)));
-                inventory.setSales(Integer.valueOf(cachedInfo.get(3)));
-                inventory.setVersion(Integer.valueOf(cachedInfo.get(4)));
-            }
+            // get inventory info from cache
+            // FIXME: Assume cache has been preloaded inventory information from database
+            int count = Integer.valueOf(RedisPoolUtils.get(INVENTORY_COUNT + inventoryId));
+            int sales = Integer.valueOf(RedisPoolUtils.get(INVENTORY_SALES + inventoryId));
+            int version = Integer.valueOf(RedisPoolUtils.get(INVENTORY_VERSION + inventoryId));
+            String name = RedisPoolUtils.get(INVENTORY_NAME + inventoryId);
+            log.info("Successfully get keys for item {} from cache", inventoryId);
 
-            if (inventory.getCount() < 1) {
+            Inventory item = new Inventory(inventoryId, name, count, sales, version);
+            if (item.getCount() < 1) {
                 return new CustomResponse(FAILED, String.format(OUT_OF_STOCK, inventoryId));
             }
+            Transaction res = updateInventoryAcid(item);
 
-            // Put transaction and delete old cached data
-            inventoryService.updateInventoryOptimistically(inventory);
-            RedisPoolUtils.del(INVENTORY_ITEM + inventoryId);
-            log.info("Clean up key {} from cache", INVENTORY_ITEM + inventoryId);
-
-            Transaction res = transactionService.createTransaction(inventory.getId());
-
-            log.info("Successfully created transaction {} for inventory {}",
-                    res.getId(), inventoryId);
             return new CustomResponse(SUCCESS, String.format(SUCCESS_RESULT, res.getId()));
         } catch (Exception e) {
             log.error("Failed to complete request for inventory {}", inventoryId, e);
@@ -135,7 +115,41 @@ public class SeckillService {
         }
     }
 
-    private String requestHelper(String inventoryId) throws IllegalAccessException {
+    private synchronized Transaction updateInventoryAcid(Inventory item) throws SQLException {
+        try {
+            inventoryService.updateInventoryOptimistically(item);
+            log.info("Update sales record in case for inventory {} version {}",
+                    item.getId(), item.getVersion());
+            updateInventorySalesInCache(item.getId());
+            log.info("Create transaction");
+            Transaction res = transactionService.createTransaction(item.getId());
+            log.info("Successfully created transaction {} for inventory {} version {}",
+                    res.getId(), item.getId(), item.getVersion() - 1);
+            return res;
+        } catch (Exception e) {
+            log.error("Failed to update database inventory sales record", e);
+            throw e;
+        }
+    }
+
+    private void updateInventorySalesInCache(String id) {
+        Jedis jedis = null;
+        try {
+            jedis = RedisPool.getJedis();
+            redis.clients.jedis.Transaction transaction = jedis.multi();
+            RedisPoolUtils.decr(INVENTORY_COUNT + id);
+            RedisPoolUtils.incr(INVENTORY_SALES + id);
+            RedisPoolUtils.incr(INVENTORY_VERSION + id);
+            transaction.exec();
+        } catch (Exception e) {
+            log.error("Failed to update cache for inventory {}", id);
+            throw new RuntimeException("Failed to update cache");
+        } finally {
+            RedisPool.closeJedis(jedis);
+        }
+    }
+
+    private String requestHelper(String inventoryId) throws IllegalAccessException, SQLException {
         Optional<Inventory> queryRes = inventoryService.getInventory(inventoryId);
         if (!queryRes.isPresent() || queryRes.get().getCount() < 1) {
             throw new IllegalArgumentException("Cannot find available item in the inventory.");

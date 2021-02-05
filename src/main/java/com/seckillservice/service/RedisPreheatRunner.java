@@ -15,7 +15,7 @@ import java.util.Optional;
 
 import static com.seckillservice.utils.constants.INVENTORY_COUNT;
 import static com.seckillservice.utils.constants.INVENTORY_NAME;
-import static com.seckillservice.utils.constants.INVENTORY_SALE;
+import static com.seckillservice.utils.constants.INVENTORY_SALES;
 import static com.seckillservice.utils.constants.INVENTORY_VERSION;
 
 @Component
@@ -28,22 +28,26 @@ public class RedisPreheatRunner implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         log.info("Preload all inventory information to cache");
-        List<String> inventoryIds = inventoryHandler.listAllInventoryIds();
-        for (String id : inventoryIds) {
-            Optional<Inventory> queriedRes = inventoryHandler.getInventory(id);
-            if (queriedRes.isPresent()) {
-                Inventory item = queriedRes.get();
-                // delete cached data and add latest data
-                RedisPoolUtils.del(INVENTORY_NAME + item.getName());
-                RedisPoolUtils.del(INVENTORY_COUNT + item.getCount());
-                RedisPoolUtils.del(INVENTORY_SALE + item.getSales());
-                RedisPoolUtils.del(INVENTORY_VERSION + item.getVersion());
+        try {
+            List<String> inventoryIds = inventoryHandler.listAllInventoryIds();
+            for (String id : inventoryIds) {
+                Optional<Inventory> queriedRes = inventoryHandler.getInventory(id);
+                if (queriedRes.isPresent()) {
+                    Inventory item = queriedRes.get();
+                    // delete cached data and add latest data
+                    RedisPoolUtils.del(INVENTORY_NAME + id);
+                    RedisPoolUtils.del(INVENTORY_COUNT + id);
+                    RedisPoolUtils.del(INVENTORY_SALES + id);
+                    RedisPoolUtils.del(INVENTORY_VERSION + id);
 
-                RedisPoolUtils.set(INVENTORY_NAME + item.getId(), item.getName());
-                RedisPoolUtils.set(INVENTORY_COUNT + item.getId(), String.valueOf(item.getCount()));
-                RedisPoolUtils.set(INVENTORY_SALE + item.getId(), String.valueOf(item.getSales()));
-                RedisPoolUtils.set(INVENTORY_VERSION + item.getId(), String.valueOf(item.getVersion()));
+                    RedisPoolUtils.set(INVENTORY_NAME + id, item.getName());
+                    RedisPoolUtils.set(INVENTORY_COUNT + id, String.valueOf(item.getCount()));
+                    RedisPoolUtils.set(INVENTORY_SALES + id, String.valueOf(item.getSales()));
+                    RedisPoolUtils.set(INVENTORY_VERSION + id, String.valueOf(item.getVersion()));
+                }
             }
+        } catch (Exception e) {
+            log.error("Failed to complete preloading inventories", e);
         }
     }
 }

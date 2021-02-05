@@ -7,6 +7,14 @@ public class Inventory {
     private int sales;
     private int version;
 
+    public Inventory(String id, String name, int count, int sales, int version) {
+        this.id = id;
+        this.name = name;
+        this.count = count;
+        this.sales = sales;
+        this.version = version;
+    }
+
     public void setId(String id) {
         this.id = id;
     }

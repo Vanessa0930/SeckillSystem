@@ -26,7 +26,7 @@ public class RedisPoolUtils {
 
     public static String get(String key) {
         Jedis jedis = null;
-        String result = null;
+        String result = "";
         try {
             jedis = RedisPool.getJedis();
             result = jedis.get(key);

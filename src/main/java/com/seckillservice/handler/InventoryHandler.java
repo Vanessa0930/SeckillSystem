@@ -17,6 +17,7 @@ import java.util.Optional;
 import static com.seckillservice.utils.constants.CONNECTION;
 import static com.seckillservice.utils.constants.GET_ALL_INVENTORY_IDS;
 import static com.seckillservice.utils.constants.GET_INVENTORY;
+import static com.seckillservice.utils.constants.GET_INVENTORY_PER_VERSION;
 import static com.seckillservice.utils.constants.ID_COLUMN_NAME;
 import static com.seckillservice.utils.constants.INITIALIZE_INVENTORY_TABLE;
 import static com.seckillservice.utils.constants.STATEMENT;
@@ -51,12 +52,7 @@ public class InventoryHandler {
             }
 
             int id = rs.getInt(1);
-            Inventory res = new Inventory();
-            res.setId(String.valueOf(id));
-            res.setCount(count);
-            res.setName(name);
-            res.setSales(0);
-            res.setVersion(1);
+            Inventory res = new Inventory(String.valueOf(id), name, count, 0, 1);
 
             rs.close();
             return res;
@@ -86,7 +82,13 @@ public class InventoryHandler {
             if (!rs.next()) {
                 return result;
             } else {
-                result = Optional.of(toInventoryObject(rs));
+                Inventory res = new Inventory(
+                        String.valueOf(rs.getInt(constants.ID_COLUMN_NAME)),
+                        rs.getString(constants.NAME_COLUMN_NAME),
+                        rs.getInt(constants.COUNT_COLUMN_NAME),
+                        rs.getInt(constants.SALES_COLUMN_NAME),
+                        rs.getInt(constants.VERSION_COLUMN_NAME));
+                result = Optional.of(res);
             }
 
             return result;
@@ -103,14 +105,26 @@ public class InventoryHandler {
      * Replace and update the inventory record following optimistic lock strategy
      * @param inventory the new object to update for
      */
-    public void updateInventoryOptimistically(Inventory inventory) {
+    public void updateInventoryOptimistically(Inventory inventory) throws SQLException {
         Connection conn = null;
         Statement stmt = null;
+
+        // control transaction commit and rollback if encountered failure
         try {
             Map<String, Object> map = setUpConnectionAndStatement();
             conn = (Connection) map.get(CONNECTION);
             stmt = (Statement) map.get(STATEMENT);
+            conn.setAutoCommit(false);
+            ResultSet rs = stmt.executeQuery(String.format(GET_INVENTORY_PER_VERSION,
+                    inventory.getId(), inventory.getVersion()));
+            if (!rs.next()) {
+                throw new RuntimeException(String.format(
+                        "Failed to update database for inventory %s version %d: no such record",
+                        inventory.getId(), inventory.getVersion()));
+            }
+
             stmt.execute(String.format(constants.UPDATE_INVENTORY, inventory.getId(), inventory.getVersion()));
+            conn.commit();
 
             inventory.setCount(inventory.getCount() - 1);
             inventory.setSales(inventory.getSales() + 1);
@@ -118,6 +132,7 @@ public class InventoryHandler {
         } catch (ClassNotFoundException e) {
             throw new RuntimeException("Cannot setup JDBC connection:", e);
         } catch (SQLException e) {
+            conn.rollback();
             throw new RuntimeException("Cannot update inventory:", e);
         } finally {
             closeConnectionAndStatement(conn, stmt);
@@ -166,16 +181,6 @@ public class InventoryHandler {
         } finally {
             closeConnectionAndStatement(conn, stmt);
         }
-    }
-
-    private Inventory toInventoryObject(ResultSet rs) throws SQLException {
-        Inventory res = new Inventory();
-        res.setId(String.valueOf(rs.getInt(constants.ID_COLUMN_NAME)));
-        res.setName(rs.getString(constants.NAME_COLUMN_NAME));
-        res.setSales(rs.getInt(constants.SALES_COLUMN_NAME));
-        res.setCount(rs.getInt(constants.COUNT_COLUMN_NAME));
-        res.setVersion(rs.getInt(constants.VERSION_COLUMN_NAME));
-        return res;
     }
 
     private void initializeInventoryTable() {
